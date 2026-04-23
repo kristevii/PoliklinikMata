@@ -12,6 +12,7 @@ if (!isset($_SESSION['id_user']) || !isset($_SESSION['role'])) {
 $id_user = $_SESSION['id_user'];
 $role = $_SESSION['role'];
 $jabatan_user = '';
+$kode_dokter_login = ''; // Variabel untuk menyimpan kode dokter yang login
 
 // Ambil data jabatan user jika role adalah Staff
 if ($role == 'Staff' || $role == 'staff') {
@@ -21,6 +22,17 @@ if ($role == 'Staff' || $role == 'staff') {
     if ($result_staff && mysqli_num_rows($result_staff) > 0) {
         $staff_data = mysqli_fetch_assoc($result_staff);
         $jabatan_user = $staff_data['jabatan_staff'];
+    }
+}
+
+// Jika role adalah Dokter, ambil kode_dokter dari data_dokter
+if ($role == 'Dokter' || $role == 'dokter') {
+    $query_dokter = "SELECT kode_dokter FROM data_dokter WHERE id_user = '$id_user'";
+    $result_dokter = mysqli_query($db->koneksi, $query_dokter);
+    
+    if ($result_dokter && mysqli_num_rows($result_dokter) > 0) {
+        $dokter_data = mysqli_fetch_assoc($result_dokter);
+        $kode_dokter_login = $dokter_data['kode_dokter'];
     }
 }
 
@@ -38,13 +50,31 @@ $entries_per_page = isset($_GET['entries']) ? (int)$_GET['entries'] : 10;
 $current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort_order = isset($_GET['sort']) && $_GET['sort'] === 'asc' ? 'asc' : 'desc';
+$filter_dokter = isset($_GET['filter_dokter']) ? $_GET['filter_dokter'] : '';
 
-// Ambil semua data antrian
-$all_antrian = $db->tampil_data_antrian();
+// Ambil data antrian berdasarkan role
+if ($role == 'Dokter' || $role == 'dokter') {
+    // Dokter hanya melihat antriannya sendiri
+    $all_antrian = $db->tampil_data_antrian_by_dokter($kode_dokter_login);
+} else {
+    // Staff (Administrasi/IT Support) melihat semua
+    $all_antrian = $db->tampil_data_antrian();
+}
 
 // Ambil data pasien dan dokter untuk dropdown
 $all_pasien = $db->tampil_data_pasien();
 $all_dokter = $db->tampil_data_dokter();
+
+// Filter data berdasarkan filter_dokter (untuk Staff)
+if (!empty($filter_dokter) && ($jabatan_user == 'Administrasi' || $jabatan_user == 'IT Support')) {
+    $filtered_by_dokter = [];
+    foreach ($all_antrian as $antrian) {
+        if ($antrian['kode_dokter'] == $filter_dokter) {
+            $filtered_by_dokter[] = $antrian;
+        }
+    }
+    $all_antrian = $filtered_by_dokter;
+}
 
 // Filter data berdasarkan search query
 if (!empty($search_query)) {
@@ -340,11 +370,14 @@ foreach ($all_pasien as $pasien) {
                                                aria-label="Search">
                                         <input type="hidden" name="entries" value="<?= $entries_per_page ?>">
                                         <input type="hidden" name="sort" value="<?= $sort_order ?>">
+                                        <?php if (!empty($filter_dokter)): ?>
+                                        <input type="hidden" name="filter_dokter" value="<?= htmlspecialchars($filter_dokter) ?>">
+                                        <?php endif; ?>
                                         <button class="btn btn-outline-secondary" type="submit">
                                             <i class="fas fa-search"></i>
                                         </button>
                                         <?php if (!empty($search_query)): ?>
-                                        <a href="dataantrian.php?entries=<?= $entries_per_page ?>&sort=<?= $sort_order ?>" class="btn btn-outline-danger" type="button">
+                                        <a href="dataantrian.php?entries=<?= $entries_per_page ?>&sort=<?= $sort_order ?><?= !empty($filter_dokter) ? '&filter_dokter=' . urlencode($filter_dokter) : '' ?>" class="btn btn-outline-danger" type="button">
                                             <i class="fas fa-times"></i>
                                         </a>
                                         <?php endif; ?>
@@ -366,7 +399,7 @@ foreach ($all_pasien as $pasien) {
                                 <thead class="table-light">
                                     <tr>
                                         <th>
-                                            <a href="<?= getSortUrl($sort_order) ?>" class="text-decoration-none text-dark">
+                                            <a href="<?= getSortUrl($sort_order, $entries_per_page, $search_query, $filter_dokter) ?>" class="text-decoration-none text-dark">
                                                 No 
                                                 <?php if ($sort_order === 'asc'): ?>
                                                     <i class="fas fa-sort-up ms-1"></i>
@@ -484,8 +517,8 @@ foreach ($all_pasien as $pasien) {
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                             </td>
+                                         </tr>
                                     <?php
                                             if ($sort_order === 'desc') {
                                                 $start_number--;
@@ -497,6 +530,10 @@ foreach ($all_pasien as $pasien) {
                                         echo '<tr><td colspan="11" class="text-center text-muted py-4">';
                                         if (!empty($search_query)) {
                                             echo 'Tidak ada data antrian yang sesuai dengan pencarian "' . htmlspecialchars($search_query) . '"';
+                                        } else if (!empty($filter_dokter)) {
+                                            echo 'Tidak ada data antrian untuk dokter yang dipilih.';
+                                        } else if (($role == 'Dokter' || $role == 'dokter') && empty($data_antrian)) {
+                                            echo 'Belum ada antrian untuk Anda hari ini.';
                                         } else {
                                             echo 'Tidak ada data antrian ditemukan.';
                                         }
@@ -518,6 +555,9 @@ foreach ($all_pasien as $pasien) {
                                     <?php if (!empty($search_query)): ?>
                                     <span class="text-info">(hasil pencarian)</span>
                                     <?php endif; ?>
+                                    <?php if (!empty($filter_dokter)): ?>
+                                    <span class="text-primary">(filter dokter)</span>
+                                    <?php endif; ?>
                                     <?php if ($sort_order === 'desc'): ?>
                                     <span class="text-warning">(diurutkan dari terbaru)</span>
                                     <?php else: ?>
@@ -531,65 +571,57 @@ foreach ($all_pasien as $pasien) {
                                     <ul class="pagination justify-content-end mb-0">
                                         <!-- Previous Page -->
                                         <li class="page-item <?= $current_page <= 1 ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="<?= $current_page > 1 ? getPaginationUrl($current_page - 1, $entries_per_page, $search_query, $sort_order) : '#' ?>">
+                                            <a class="page-link" href="<?= $current_page > 1 ? getPaginationUrl($current_page - 1, $entries_per_page, $search_query, $sort_order, $filter_dokter) : '#' ?>">
                                                 Sebelumnya
                                             </a>
                                         </li>
                                         
-                                        <!-- Page Numbers dengan format: Sebelumnya | 1 | 2 3 4 5... 11 Selanjutnya -->
+                                        <!-- Page Numbers -->
                                         <?php
-                                        // Selalu tampilkan halaman 1
                                         echo '<li class="page-item ' . ($current_page == 1 ? 'active' : '') . '">';
-                                        echo '<a class="page-link" href="' . getPaginationUrl(1, $entries_per_page, $search_query, $sort_order) . '">1</a>';
+                                        echo '<a class="page-link" href="' . getPaginationUrl(1, $entries_per_page, $search_query, $sort_order, $filter_dokter) . '">1</a>';
                                         echo '</li>';
                                         
-                                        // Tentukan range halaman yang akan ditampilkan
                                         $start = 2;
                                         $end = min(5, $total_pages - 1);
                                         
-                                        // Jika current page > 3, adjust the range
                                         if ($current_page > 3) {
                                             $start = $current_page - 1;
                                             $end = min($current_page + 2, $total_pages - 1);
                                         }
                                         
-                                        // Tampilkan ellipsis jika ada gap
                                         if ($start > 2) {
                                             echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
                                         }
                                         
-                                        // Tampilkan halaman-halaman
                                         for ($i = $start; $i <= $end; $i++) {
                                             if ($i < $total_pages) {
                                                 echo '<li class="page-item ' . ($i == $current_page ? 'active' : '') . '">';
-                                                echo '<a class="page-link" href="' . getPaginationUrl($i, $entries_per_page, $search_query, $sort_order) . '">' . $i . '</a>';
+                                                echo '<a class="page-link" href="' . getPaginationUrl($i, $entries_per_page, $search_query, $sort_order, $filter_dokter) . '">' . $i . '</a>';
                                                 echo '</li>';
                                             }
                                         }
                                         
-                                        // Tampilkan ellipsis sebelum halaman terakhir jika perlu
                                         if ($end < $total_pages - 1) {
                                             echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
                                         }
                                         
-                                        // Tampilkan halaman terakhir jika lebih dari 1 halaman
                                         if ($total_pages > 1) {
                                             echo '<li class="page-item ' . ($current_page == $total_pages ? 'active' : '') . '">';
-                                            echo '<a class="page-link" href="' . getPaginationUrl($total_pages, $entries_per_page, $search_query, $sort_order) . '">' . $total_pages . '</a>';
+                                            echo '<a class="page-link" href="' . getPaginationUrl($total_pages, $entries_per_page, $search_query, $sort_order, $filter_dokter) . '">' . $total_pages . '</a>';
                                             echo '</li>';
                                         }
                                         ?>
                                         
                                         <!-- Next Page -->
                                         <li class="page-item <?= $current_page >= $total_pages ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="<?= $current_page < $total_pages ? getPaginationUrl($current_page + 1, $entries_per_page, $search_query, $sort_order) : '#' ?>">
+                                            <a class="page-link" href="<?= $current_page < $total_pages ? getPaginationUrl($current_page + 1, $entries_per_page, $search_query, $sort_order, $filter_dokter) : '#' ?>">
                                                 Selanjutnya
                                             </a>
                                         </li>
                                     </ul>
                                 </nav>
                                 <?php else: ?>
-                                <!-- Tampilkan pagination sederhana jika hanya 1 halaman -->
                                 <nav aria-label="Page navigation">
                                     <ul class="pagination justify-content-end mb-0">
                                         <li class="page-item disabled">
@@ -1024,9 +1056,13 @@ foreach ($all_pasien as $pasien) {
             const entries = document.getElementById('entriesPerPage').value;
             const search = '<?= $search_query ?>';
             const sort = '<?= $sort_order ?>';
+            const filterDokter = '<?= $filter_dokter ?>';
             let url = 'dataantrian.php?entries=' + entries + '&page=1&sort=' + sort;
             if (search) {
                 url += '&search=' + encodeURIComponent(search);
+            }
+            if (filterDokter) {
+                url += '&filter_dokter=' + encodeURIComponent(filterDokter);
             }
             window.location.href = url;
         }
@@ -1189,7 +1225,7 @@ foreach ($all_pasien as $pasien) {
 
 <?php
 // Fungsi untuk membuat URL pagination
-function getPaginationUrl($page, $entries, $search = '', $sort = 'asc') {
+function getPaginationUrl($page, $entries, $search = '', $sort = 'asc', $filter_dokter = '') {
     $url = 'dataantrian.php?';
     $params = [];
     
@@ -1209,16 +1245,17 @@ function getPaginationUrl($page, $entries, $search = '', $sort = 'asc') {
         $params[] = 'sort=' . $sort;
     }
     
+    if (!empty($filter_dokter)) {
+        $params[] = 'filter_dokter=' . urlencode($filter_dokter);
+    }
+    
     return $url . implode('&', $params);
 }
 
 // Fungsi untuk membuat URL sorting
-function getSortUrl($current_sort) {
+function getSortUrl($current_sort, $entries, $search = '', $filter_dokter = '') {
     $url = 'dataantrian.php?';
     $params = [];
-    
-    $entries = isset($_GET['entries']) ? (int)$_GET['entries'] : 10;
-    $search = isset($_GET['search']) ? trim($_GET['search']) : '';
     
     if ($entries != 10) {
         $params[] = 'entries=' . $entries;
@@ -1226,6 +1263,10 @@ function getSortUrl($current_sort) {
     
     if (!empty($search)) {
         $params[] = 'search=' . urlencode($search);
+    }
+    
+    if (!empty($filter_dokter)) {
+        $params[] = 'filter_dokter=' . urlencode($filter_dokter);
     }
     
     $new_sort = $current_sort === 'asc' ? 'desc' : 'asc';

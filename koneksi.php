@@ -226,6 +226,18 @@ class database {
         }
         return $hasil;
     }
+    function tampil_data_antrian_by_dokter($kode_dokter) {
+        $query = "SELECT * FROM data_antrian WHERE kode_dokter = '$kode_dokter' ORDER BY id_antrian DESC";
+        $result = mysqli_query($this->koneksi, $query);
+        
+        $data = array();
+        if ($result && mysqli_num_rows($result) > 0) {
+            while ($row = mysqli_fetch_assoc($result)) {
+                $data[] = $row;
+            }
+        }
+        return $data;
+    }
     function tampil_data_rekam_medis(){
         $hasil = [];
         $data = mysqli_query($this->koneksi, "select id_rekam, id_pasien, kode_dokter, tanggal_periksa, diagnosa, keluhan, catatan, jenis_kunjungan from data_rekam_medis");
