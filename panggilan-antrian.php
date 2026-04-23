@@ -193,6 +193,20 @@ $nextAntrianRuang1 = getNextAntrian($db, 'DRM001', $today, 3);
 $nextAntrianRuang2 = getNextAntrian($db, 'DRM002', $today, 3);
 $nextAntrianRuang3 = getNextAntrian($db, 'DRM003', $today, 3);
 $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
+
+// Tambahkan variabel untuk menyimpan data antrian lengkap dalam format JSON
+$allAntrianData = [
+    'ruang1' => $antrianRuang1,
+    'ruang2' => $antrianRuang2,
+    'ruang3' => $antrianRuang3,
+    'kontrol' => $antrianKontrol,
+    'menunggu' => [
+        'ruang1' => $nextAntrianRuang1,
+        'ruang2' => $nextAntrianRuang2,
+        'ruang3' => $nextAntrianRuang3,
+        'kontrol' => $nextAntrianKontrol
+    ]
+];
 ?>
 
 <!DOCTYPE html>
@@ -472,6 +486,85 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
         .card-body {
             padding: 1.25rem;
         }
+
+        /* Tombol Ulang Panggilan */
+        .btn-repeat-call {
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-repeat-call:hover {
+            background-color: #e68900;
+            transform: scale(1.02);
+        }
+        
+        .btn-repeat-call:active {
+            transform: scale(0.98);
+        }
+        
+        /* Tombol suara utama */
+        .sound-toggle-btn {
+            position: fixed;
+            bottom: 140px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #2c80ff;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .sound-toggle-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .sound-toggle-btn.sound-off {
+            background: #6c757d;
+        }
+        
+        .sound-toggle-btn.sound-on {
+            background: #10b981;
+            animation: soundPulse 1s infinite;
+        }
+        
+        @keyframes soundPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 15px rgba(16, 185, 129, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+        
+        /* Animasi saat dipanggil */
+        .speaking {
+            animation: speakGlow 0.5s ease-in-out 3;
+        }
+        
+        @keyframes speakGlow {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0.3); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
     </style>
 </head>
 
@@ -508,7 +601,7 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
             <div class="row">
                 <!-- Ruang 1 - DRM001 (Jenis Baru) -->
                 <div class="col-xl-3 col-lg-6 col-md-6">
-                    <div class="card antrian-card">
+                    <div class="card antrian-card" id="card-ruang1">
                         <div class="card-header card-header-ruang">
                             <h3 class="ruang-title mb-0">Ruang 1</h3>
                             <div class="ruang-subtitle">Kode: DRM001</div>
@@ -545,6 +638,11 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
                                     <i class="ti ti-bell-ringing me-1"></i>
                                     <?php echo $status_label; ?>
                                 </div>
+                                
+                                <!-- Tombol Ulang Panggilan -->
+                                <button class="btn-repeat-call" onclick="repeatCall('ruang1', '<?php echo htmlspecialchars($antrianRuang1['nomor_antrian']); ?>', '<?php echo htmlspecialchars($antrianRuang1['nama_pasien'] ?? 'Pasien'); ?>', '<?php echo htmlspecialchars($antrianRuang1['ruang'] ?? 'Ruang 1'); ?>')">
+                                    <i class="ti ti-volume-2"></i> Ulang Panggilan
+                                </button>
                                 
                                 <div class="stats-box">
                                     <div class="stat-item">
@@ -594,7 +692,7 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
 
                 <!-- Ruang 2 - DRM002 (Jenis Baru) -->
                 <div class="col-xl-3 col-lg-6 col-md-6">
-                    <div class="card antrian-card ruang-2">
+                    <div class="card antrian-card ruang-2" id="card-ruang2">
                         <div class="card-header card-header-ruang">
                             <h3 class="ruang-title mb-0">Ruang 2</h3>
                             <div class="ruang-subtitle">Kode: DRM002</div>
@@ -631,6 +729,10 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
                                     <i class="ti ti-bell-ringing me-1"></i>
                                     <?php echo $status_label; ?>
                                 </div>
+                                
+                                <button class="btn-repeat-call" onclick="repeatCall('ruang2', '<?php echo htmlspecialchars($antrianRuang2['nomor_antrian']); ?>', '<?php echo htmlspecialchars($antrianRuang2['nama_pasien'] ?? 'Pasien'); ?>', '<?php echo htmlspecialchars($antrianRuang2['ruang'] ?? 'Ruang 2'); ?>')">
+                                    <i class="ti ti-volume-2"></i> Ulang Panggilan
+                                </button>
                                 
                                 <div class="stats-box">
                                     <div class="stat-item">
@@ -680,7 +782,7 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
 
                 <!-- Ruang 3 - DRM003 (Jenis Baru) -->
                 <div class="col-xl-3 col-lg-6 col-md-6">
-                    <div class="card antrian-card ruang-3">
+                    <div class="card antrian-card ruang-3" id="card-ruang3">
                         <div class="card-header card-header-ruang">
                             <h3 class="ruang-title mb-0">Ruang 3</h3>
                             <div class="ruang-subtitle">Kode: DRM003</div>
@@ -717,6 +819,10 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
                                     <i class="ti ti-bell-ringing me-1"></i>
                                     <?php echo $status_label; ?>
                                 </div>
+                                
+                                <button class="btn-repeat-call" onclick="repeatCall('ruang3', '<?php echo htmlspecialchars($antrianRuang3['nomor_antrian']); ?>', '<?php echo htmlspecialchars($antrianRuang3['nama_pasien'] ?? 'Pasien'); ?>', '<?php echo htmlspecialchars($antrianRuang3['ruang'] ?? 'Ruang 3'); ?>')">
+                                    <i class="ti ti-volume-2"></i> Ulang Panggilan
+                                </button>
                                 
                                 <div class="stats-box">
                                     <div class="stat-item">
@@ -766,7 +872,7 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
 
                 <!-- Kontrol (dari data_antrian dengan jenis_antrian = 'Kontrol') -->
                 <div class="col-xl-3 col-lg-6 col-md-6">
-                    <div class="card antrian-card kontrol">
+                    <div class="card antrian-card kontrol" id="card-kontrol">
                         <div class="card-header card-header-ruang">
                             <h3 class="ruang-title mb-0">Kontrol</h3>
                             <div class="ruang-subtitle">Pasien Kontrol</div>
@@ -797,6 +903,10 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
                                     <i class="ti ti-bell-ringing me-1"></i>
                                     <?php echo $status_label; ?>
                                 </div>
+                                
+                                <button class="btn-repeat-call" onclick="repeatCall('kontrol', '<?php echo htmlspecialchars($antrianKontrol['nomor_antrian']); ?>', '<?php echo htmlspecialchars($antrianKontrol['nama_pasien'] ?? 'Pasien'); ?>', '<?php echo htmlspecialchars($antrianKontrol['ruang'] ?? 'Ruang Kontrol'); ?>', true)">
+                                    <i class="ti ti-volume-2"></i> Ulang Panggilan
+                                </button>
                                 
                                 <div class="stats-box">
                                     <div class="stat-item">
@@ -853,6 +963,11 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
         </div>
     </div>
 
+    <!-- Tombol Suara -->
+    <button class="sound-toggle-btn" id="soundToggleBtn" title="Aktifkan/Nonaktifkan Suara (Tekan lama untuk test)">
+        <i class="ti ti-volume-3" id="soundIcon"></i>
+    </button>
+
     <!-- Scripts -->
     <script src="assets/js/plugins/popper.min.js"></script>
     <script src="assets/js/plugins/simplebar.min.js"></script>
@@ -862,6 +977,152 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
     <script src="assets/js/plugins/feather.min.js"></script>
 
     <script>
+        // Data antrian dari PHP
+        const antrianData = <?php echo json_encode($allAntrianData); ?>;
+        
+        // Konfigurasi suara
+        let soundEnabled = localStorage.getItem('soundEnabled') === 'true';
+        let lastCalledAntrian = {
+            ruang1: '',
+            ruang2: '',
+            ruang3: '',
+            kontrol: ''
+        };
+        
+        // Fungsi untuk memainkan suara
+        function speakText(text) {
+            if (!soundEnabled) return;
+            
+            if (!('speechSynthesis' in window)) {
+                console.warn('Browser tidak mendukung Web Speech API');
+                return;
+            }
+            
+            // Hentikan suara yang sedang berjalan
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'id-ID';
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            
+            // Pilih suara terbaik untuk bahasa Indonesia
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(voice => 
+                voice.lang === 'id-ID' && (voice.name.includes('Google') || voice.name.includes('Microsoft'))
+            );
+            if (preferredVoice) {
+                utterance.voice = preferredVoice;
+            }
+            
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // Fungsi panggilan otomatis (1x saja)
+        function callQueueSound(ruang, nomorAntrian, namaPasien, ruangName, isKontrol = false) {
+            if (!soundEnabled) return;
+            
+            let jenisAntrian = isKontrol ? 'Kontrol ' : '';
+            let message = `Kepada ${jenisAntrian}Antrian dengan Nomor ${nomorAntrian}, ${namaPasien} silahkan menuju ke ${ruangName}.`;
+            
+            // Animasi pada card
+            const cardId = `card-${ruang}`;
+            const cardElement = document.getElementById(cardId);
+            if (cardElement) {
+                cardElement.classList.add('speaking');
+                setTimeout(() => cardElement.classList.remove('speaking'), 2000);
+            }
+            
+            speakText(message);
+        }
+        
+        // Fungsi untuk mengulang panggilan (dipanggil dari tombol)
+        function repeatCall(ruang, nomorAntrian, namaPasien, ruangName, isKontrol = false) {
+            if (!soundEnabled) {
+                return;
+            }
+            
+            if (!nomorAntrian) {
+                return;
+            }
+            
+            let jenisAntrian = isKontrol ? 'Kontrol ' : '';
+            let message = `Perhatian, Saya Ulangi Panggilan. Kepada ${jenisAntrian}Antrian dengan Nomor ${nomorAntrian}, ${namaPasien} silahkan menuju ke ${ruangName}.`;
+            
+            // Animasi pada card
+            const cardId = `card-${ruang}`;
+            const cardElement = document.getElementById(cardId);
+            if (cardElement) {
+                cardElement.classList.add('speaking');
+                setTimeout(() => cardElement.classList.remove('speaking'), 2000);
+            }
+            
+            speakText(message);
+        }
+        
+        // Fungsi untuk mengecek perubahan antrian dan memanggil suara
+        function checkAndCallQueue() {
+            const ruangs = ['ruang1', 'ruang2', 'ruang3', 'kontrol'];
+            
+            ruangs.forEach(ruang => {
+                const currentAntrian = antrianData[ruang];
+                const currentNomor = currentAntrian && currentAntrian.nomor_antrian ? currentAntrian.nomor_antrian : '';
+                const lastNomor = lastCalledAntrian[ruang];
+                
+                // Jika ada antrian baru dengan status Dipanggil
+                if (currentNomor && currentNomor !== lastNomor && currentAntrian.status === 'Dipanggil') {
+                    let ruangName = currentAntrian.ruang || '';
+                    let isKontrol = (ruang === 'kontrol');
+                    
+                    if (ruang === 'ruang1') ruangName = ruangName || 'Ruang 1';
+                    else if (ruang === 'ruang2') ruangName = ruangName || 'Ruang 2';
+                    else if (ruang === 'ruang3') ruangName = ruangName || 'Ruang 3';
+                    else ruangName = ruangName || 'Ruang Kontrol';
+                    
+                    callQueueSound(ruang, currentNomor, currentAntrian.nama_pasien || 'Pasien', ruangName, isKontrol);
+                    lastCalledAntrian[ruang] = currentNomor;
+                }
+            });
+            
+            // Simpan ke localStorage
+            localStorage.setItem('lastCalledAntrian', JSON.stringify(lastCalledAntrian));
+        }
+        
+        // Event listener untuk tombol suara
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundIcon = document.getElementById('soundIcon');
+        
+        function updateSoundButton() {
+            if (soundEnabled) {
+                soundToggleBtn.classList.remove('sound-off');
+                soundToggleBtn.classList.add('sound-on');
+                soundIcon.className = 'ti ti-volume-2';
+                soundToggleBtn.title = 'Suara Aktif - Klik untuk nonaktifkan';
+            } else {
+                soundToggleBtn.classList.remove('sound-on');
+                soundToggleBtn.classList.add('sound-off');
+                soundIcon.className = 'ti ti-volume-3';
+                soundToggleBtn.title = 'Suara Nonaktif - Klik untuk aktifkan';
+            }
+        }
+        
+        soundToggleBtn.addEventListener('click', function() {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem('soundEnabled', soundEnabled);
+            updateSoundButton();
+            
+            if (soundEnabled) {
+                // Cek antrian saat ini
+                setTimeout(() => checkAndCallQueue(), 500);
+            } else {
+                // Hentikan suara yang sedang berjalan
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                }
+            }
+        });
+        
         // Countdown timer untuk refresh
         let countdown = 10;
         const countdownElement = document.getElementById('countdown');
@@ -870,6 +1131,10 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
             countdown--;
             if (countdown < 0) {
                 countdown = 10;
+                // Setiap kali refresh, cek antrian baru
+                setTimeout(() => {
+                    location.reload();
+                }, 100);
             }
             if (countdownElement) {
                 countdownElement.textContent = countdown;
@@ -882,8 +1147,8 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
         function updateRealTime() {
             const now = new Date();
             
-            const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                            'July', 'August', 'September', 'October', 'November', 'December'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
             const dateStr = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
             
             const hours = now.getHours().toString().padStart(2, '0');
@@ -900,10 +1165,34 @@ $nextAntrianKontrol = getNextAntrianKontrol($db, $today, 3);
         
         setInterval(updateRealTime, 1000);
         
+        // Inisialisasi
         document.addEventListener('DOMContentLoaded', function() {
             updateRealTime();
             feather.replace();
+            
+            // Load last called antrian dari localStorage
+            const savedLastCalled = localStorage.getItem('lastCalledAntrian');
+            if (savedLastCalled) {
+                try {
+                    lastCalledAntrian = JSON.parse(savedLastCalled);
+                } catch(e) {}
+            }
+            
+            // Set initial sound button state
+            updateSoundButton();
+            
+            // Cek antrian pertama kali
+            setTimeout(() => {
+                checkAndCallQueue();
+            }, 1000);
         });
+        
+        // Dapatkan voices setelah loaded
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                console.log('Voices loaded');
+            };
+        }
     </script>
 </body>
 </html>

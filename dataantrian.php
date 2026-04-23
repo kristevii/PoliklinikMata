@@ -624,113 +624,108 @@ foreach ($all_pasien as $pasien) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="card border-success">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Data Antrian Baru</h5>
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <div class="nomor-antrian" style="font-size: 1.3em; padding: 10px 20px; margin: 0 auto; display: inline-block;">
+                                <span id="preview_nomor_display">-</span>
+                            </div>
+                            <div class="mt-2 text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Nomor antrian akan digenerate otomatis
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <div class="text-center mb-4">
-                                <div class="nomor-antrian" style="font-size: 1.3em; padding: 10px 20px; margin: 0 auto; display: inline-block;">
-                                    <span id="preview_nomor_display">-</span>
+                        
+                        <form method="POST" action="proses/tambah/tambah-data-antrian.php" id="formTambahAntrian">
+                            <input type="hidden" name="tambah_antrian" value="1">
+                            <input type="hidden" name="nomor_antrian" id="nomor_antrian_hidden">
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jenis_antrian" class="form-label">Jenis Antrian <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="jenis_antrian" name="jenis_antrian" required onchange="toggleTanggalAntrian()">
+                                            <option value="Baru">Baru</option>
+                                            <option value="Kontrol">Kontrol</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="mt-2 text-muted">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    Nomor antrian akan digenerate otomatis
+                                <div class="col-md-6" id="tanggal_antrian_container" style="display:none;">
+                                    <div class="mb-3">
+                                        <label for="tanggal_antrian" class="form-label">Tanggal Kontrol <span class="text-danger">*</span></label>
+                                        <input type="datetime-local" class="form-control" id="tanggal_antrian" name="tanggal_antrian">
+                                        <small class="text-muted">Pilih tanggal dan waktu kontrol pasien</small>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <form method="POST" action="proses/tambah/tambah-data-antrian.php" id="formTambahAntrian">
-                                <input type="hidden" name="tambah_antrian" value="1">
-                                <input type="hidden" name="nomor_antrian" id="nomor_antrian_hidden">
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="jenis_antrian" class="form-label">Jenis Antrian <span class="text-danger">*</span></label>
-                                            <select class="form-select" id="jenis_antrian" name="jenis_antrian" required onchange="toggleTanggalAntrian()">
-                                                <option value="Baru">Baru</option>
-                                                <option value="Kontrol">Kontrol</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6" id="tanggal_antrian_container" style="display:none;">
-                                        <div class="mb-3">
-                                            <label for="tanggal_antrian" class="form-label">Tanggal Kontrol <span class="text-danger">*</span></label>
-                                            <input type="datetime-local" class="form-control" id="tanggal_antrian" name="tanggal_antrian">
-                                            <small class="text-muted">Pilih tanggal dan waktu kontrol pasien</small>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <div class="mb-3">
-                                    <label for="id_pasien" class="form-label">Pasien <span class="text-danger">*</span></label>
-                                    <select class="form-select select2-pasien-tambah" id="id_pasien" name="id_pasien" required style="width: 100%;">
-                                        <option value="">-- Cari Pasien (ID / NIK / Nama) --</option>
-                                        <?php if (!empty($all_pasien)): ?>
-                                            <?php foreach ($all_pasien as $pasien): ?>
-                                                <option value="<?= htmlspecialchars($pasien['id_pasien'] ?? '') ?>"
-                                                        data-nik="<?= htmlspecialchars($pasien['nik'] ?? '') ?>"
-                                                        data-nama="<?= htmlspecialchars($pasien['nama_pasien'] ?? '') ?>">
-                                                    <?= htmlspecialchars($pasien['id_pasien'] ?? '') ?> - 
-                                                    <?= htmlspecialchars($pasien['nik'] ?? '') ?> - 
-                                                    <?= htmlspecialchars($pasien['nama_pasien'] ?? '') ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <option value="">Tidak ada data pasien</option>
-                                        <?php endif; ?>
-                                    </select>
-                                </div>
+                            <div class="mb-3">
+                                <label for="id_pasien" class="form-label">Pasien <span class="text-danger">*</span></label>
+                                <select class="form-select select2-pasien-tambah" id="id_pasien" name="id_pasien" required style="width: 100%;">
+                                    <option value="">-- Cari Pasien (ID / NIK / Nama) --</option>
+                                    <?php if (!empty($all_pasien)): ?>
+                                        <?php foreach ($all_pasien as $pasien): ?>
+                                            <option value="<?= htmlspecialchars($pasien['id_pasien'] ?? '') ?>"
+                                                    data-nik="<?= htmlspecialchars($pasien['nik'] ?? '') ?>"
+                                                    data-nama="<?= htmlspecialchars($pasien['nama_pasien'] ?? '') ?>">
+                                                <?= htmlspecialchars($pasien['id_pasien'] ?? '') ?> - 
+                                                <?= htmlspecialchars($pasien['nik'] ?? '') ?> - 
+                                                <?= htmlspecialchars($pasien['nama_pasien'] ?? '') ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <option value="">Tidak ada data pasien</option>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
 
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="kode_dokter" class="form-label">Dokter</label>
-                                            <select class="form-select" id="kode_dokter" name="kode_dokter">
-                                                <option value="">Pilih Dokter</option>
-                                                <?php if (!empty($all_dokter)): ?>
-                                                    <?php foreach ($all_dokter as $dokter): ?>
-                                                        <option value="<?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?>">
-                                                            <?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?> - <?= htmlspecialchars($dokter['nama_dokter'] ?? '') ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                <?php else: ?>
-                                                    <option value="">Tidak tersedia</option>
-                                                <?php endif; ?>
-                                            </select>
-                                            <small class="text-muted">Ruang diambil otomatis dari data dokter</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="status" class="form-label">Status</label>
-                                            <select class="form-select" id="status" name="status">
-                                                <option value="Dijadwalkan" selected>Dijadwalkan</option>
-                                                <option value="Menunggu">Menunggu</option>
-                                                <option value="Dipanggil">Dipanggil</option>
-                                                <option value="Dilayani">Dilayani</option>
-                                                <option value="Selesai">Selesai</option>
-                                                <option value="Batal">Batal</option>
-                                            </select>
-                                        </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="kode_dokter" class="form-label">Dokter</label>
+                                        <select class="form-select" id="kode_dokter" name="kode_dokter">
+                                            <option value="">Pilih Dokter</option>
+                                            <?php if (!empty($all_dokter)): ?>
+                                                <?php foreach ($all_dokter as $dokter): ?>
+                                                    <option value="<?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?>">
+                                                        <?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?> - <?= htmlspecialchars($dokter['nama_dokter'] ?? '') ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <option value="">Tidak tersedia</option>
+                                            <?php endif; ?>
+                                        </select>
+                                        <small class="text-muted">Ruang diambil otomatis dari data dokter</small>
                                     </div>
                                 </div>
-
-                                <div class="alert alert-warning mt-3">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    <strong>Perhatian:</strong> Pastikan semua data sudah benar sebelum disimpan.
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="status" class="form-label">Status</label>
+                                        <select class="form-select" id="status" name="status">
+                                            <option value="Dijadwalkan" selected>Dijadwalkan</option>
+                                            <option value="Menunggu">Menunggu</option>
+                                            <option value="Dipanggil">Dipanggil</option>
+                                            <option value="Dilayani">Dilayani</option>
+                                            <option value="Selesai">Selesai</option>
+                                            <option value="Batal">Batal</option>
+                                        </select>
+                                    </div>
                                 </div>
+                            </div>
 
-                                <div class="text-end mt-4">
-                                    <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">
-                                        <i class="fas fa-times me-1"></i>Batal
-                                    </button>
-                                    <button type="submit" class="btn btn-success" id="btnTambahAntrian">
-                                        <i class="fas fa-save me-1"></i>Simpan Antrian
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Perhatian:</strong> Pastikan semua data sudah benar sebelum disimpan.
+                            </div>
+
+                            <div class="text-end mt-4">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">
+                                    <i class="fas fa-times me-1"></i>Batal
+                                </button>
+                                <button type="submit" class="btn btn-success" id="btnTambahAntrian">
+                                    <i class="fas fa-save me-1"></i>Simpan Antrian
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

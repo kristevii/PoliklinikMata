@@ -13,6 +13,7 @@ if (!isset($_SESSION['id_user']) || !isset($_SESSION['role'])) {
 $id_user = $_SESSION['id_user'];
 $role = $_SESSION['role'];
 $jabatan_user = '';
+$kode_dokter_session = ''; // Untuk menyimpan kode dokter yang sedang login
 
 // Ambil data jabatan user jika role adalah Staff
 if ($role == 'Staff' || $role == 'staff') {
@@ -22,6 +23,21 @@ if ($role == 'Staff' || $role == 'staff') {
     if ($result_staff && $result_staff->num_rows > 0) {
         $staff_data = $result_staff->fetch_assoc();
         $jabatan_user = $staff_data['jabatan_staff'];
+    }
+}
+
+// Ambil kode_dokter jika role adalah Dokter
+if ($role == 'Dokter' || $role == 'dokter') {
+    $kode_dokter_session = $_SESSION['kode_dokter'] ?? '';
+    
+    if (empty($kode_dokter_session)) {
+        $query_dokter = "SELECT kode_dokter FROM data_dokter WHERE id_user = '$id_user'";
+        $result_dokter = $db->koneksi->query($query_dokter);
+        if ($result_dokter && $result_dokter->num_rows > 0) {
+            $dokter_data = $result_dokter->fetch_assoc();
+            $kode_dokter_session = $dokter_data['kode_dokter'];
+            $_SESSION['kode_dokter'] = $kode_dokter_session;
+        }
     }
 }
 
@@ -87,6 +103,16 @@ if (isset($_GET['hapus'])) {
     $id_rekam = $_GET['hapus'];
     $rekam_data = $db->get_rekam_by_id($id_rekam);
 
+    // Validasi untuk dokter: hanya bisa hapus rekam medis miliknya
+    if ($role == 'Dokter' || $role == 'dokter') {
+        if ($rekam_data['kode_dokter'] != $kode_dokter_session) {
+            $_SESSION['notif_status'] = 'error';
+            $_SESSION['notif_message'] = 'Anda tidak memiliki izin untuk menghapus rekam medis dokter lain.';
+            header("Location: datarekammedis.php");
+            exit();
+        }
+    }
+
     if ($db->hapus_data_rekam($id_rekam)) {
         $username = $_SESSION['username'] ?? 'unknown user';
         $db->tambah_aktivitas_user('Hapus', 'Rekam Medis', "Rekam medis ID '{$rekam_data['id_rekam']}' berhasil dihapus oleh $username.", date('Y-m-d H:i:s'));
@@ -114,6 +140,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_rekam_medis'])) 
         $_SESSION['notif_message'] = 'Field pasien dan dokter wajib diisi!';
         header("Location: datarekammedis.php");
         exit();
+    }
+
+    // Validasi untuk dokter: hanya bisa edit rekam medis miliknya
+    if ($role == 'Dokter' || $role == 'dokter') {
+        $cek_query = "SELECT kode_dokter FROM rekam_medis WHERE id_rekam = '$id_rekam'";
+        $cek_result = $db->koneksi->query($cek_query);
+        if ($cek_result && $cek_result->num_rows > 0) {
+            $rekam_data = $cek_result->fetch_assoc();
+            if ($rekam_data['kode_dokter'] != $kode_dokter_session) {
+                $_SESSION['notif_status'] = 'error';
+                $_SESSION['notif_message'] = 'Anda tidak memiliki izin untuk mengedit rekam medis dokter lain.';
+                header("Location: datarekammedis.php");
+                exit();
+            }
+        }
+        
+        // Jika dokter mencoba mengganti kode_dokter dengan dokter lain, tolak
+        if ($kode_dokter != $kode_dokter_session) {
+            $_SESSION['notif_status'] = 'error';
+            $_SESSION['notif_message'] = 'Anda hanya dapat mengedit rekam medis dengan kode dokter Anda sendiri.';
+            header("Location: datarekammedis.php");
+            exit();
+        }
     }
 
     if ($db->edit_data_rekam($id_rekam, $id_pasien, $kode_dokter, $jenis_kunjungan, $keluhan, $diagnosa, $catatan)) {
@@ -146,19 +195,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_rekam_medis'])
         exit();
     }
 
+    // Validasi untuk dokter: hanya bisa menambah rekam medis dengan kode dokter sendiri
+    if ($role == 'Dokter' || $role == 'dokter') {
+        if ($kode_dokter != $kode_dokter_session) {
+            $_SESSION['notif_status'] = 'error';
+            $_SESSION['notif_message'] = 'Anda hanya dapat menambah rekam medis dengan kode dokter Anda sendiri.';
+            header("Location: datarekammedis.php");
+            exit();
+        }
+    }
+
     // Tambah data rekam medis dan dapatkan ID-nya
     $id_rekam = $db->tambah_data_rekam($id_pasien, $kode_dokter, $jenis_kunjungan, $tanggal_periksa, $keluhan, $diagnosa, $catatan);
     
     if ($id_rekam) {
         // ========== OTOMATIS BUAT TRANSAKSI DARI REKAM MEDIS ==========
         // Data default untuk transaksi
-        $kode_staff = $_SESSION['kode_staff'] ?? null; // Ambil dari session jika ada
-        $grand_total = 0; // Default 0, bisa diupdate nanti di halaman transaksi
+        $kode_staff = $_SESSION['kode_staff'] ?? null;
+        $grand_total = 0;
         $metode_pembayaran = 'Tunai';
         $status_pembayaran = 'Belum Bayar';
         $tanggal_transaksi = date('Y-m-d H:i:s');
         
-        // Panggil function tambah_data_transaksi_by_rekam dengan hanya mengirim id_rekam
         $id_transaksi = $db->tambah_data_transaksi_by_rekam(
             $id_rekam,
             $kode_staff,
@@ -179,7 +237,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_rekam_medis'])
             $_SESSION['notif_status'] = 'success';
             $_SESSION['notif_message'] = 'Data rekam medis berhasil ditambahkan dan transaksi otomatis telah dibuat.';
         } else {
-            // Rekam medis berhasil tapi transaksi gagal
             $username = $_SESSION['username'] ?? 'unknown user';
             $db->tambah_aktivitas_user(
                 'Tambah', 
@@ -190,8 +247,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_rekam_medis'])
             $_SESSION['notif_status'] = 'warning';
             $_SESSION['notif_message'] = 'Data rekam medis berhasil ditambahkan, tetapi gagal membuat transaksi otomatis. Silakan tambah transaksi secara manual di halaman Data Transaksi.';
         }
-        // ========== SELESAI OTOMATIS BUAT TRANSAKSI ==========
-        
     } else {
         $_SESSION['notif_status'] = 'error';
         $_SESSION['notif_message'] = 'Gagal menambahkan data rekam medis.';
@@ -205,7 +260,15 @@ $current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort_order = isset($_GET['sort']) && $_GET['sort'] === 'desc' ? 'desc' : 'asc';
 
-$all_rekam_medis = $db->tampil_data_rekam_medis();
+// Ambil data rekam medis dengan filter berdasarkan role
+if ($role == 'Dokter' || $role == 'dokter') {
+    // Dokter hanya melihat rekam medis dengan kode_dokter miliknya
+    $all_rekam_medis = $db->tampil_data_rekam_medis_by_dokter($kode_dokter_session);
+} else {
+    // Staff melihat semua data
+    $all_rekam_medis = $db->tampil_data_rekam_medis();
+}
+
 $all_pasien = $db->tampil_data_pasien();
 $all_dokter = $db->tampil_data_dokter();
 
@@ -575,16 +638,22 @@ unset($_SESSION['notif_status'], $_SESSION['notif_message']);
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="kode_dokter" class="form-label">Dokter <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="kode_dokter" name="kode_dokter" required>
-                                        <option value="">Pilih Dokter</option>
-                                        <?php if (!empty($all_dokter)): ?>
-                                            <?php foreach ($all_dokter as $dokter): ?>
-                                                <option value="<?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?>"><?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?> - <?= htmlspecialchars($dokter['nama_dokter'] ?? '') ?></option>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <option value="">Data dokter tidak tersedia</option>
-                                        <?php endif; ?>
-                                    </select>
+                                    <?php if ($role == 'Dokter' || $role == 'dokter'): ?>
+                                        <input type="text" class="form-control readonly-field" value="<?= htmlspecialchars($kode_dokter_session) ?> - <?= htmlspecialchars(getNamaDokterByKode($kode_dokter_session, $all_dokter)) ?>" readonly disabled>
+                                        <input type="hidden" name="kode_dokter" value="<?= htmlspecialchars($kode_dokter_session) ?>">
+                                        <small class="text-muted">Dokter terikat dengan akun Anda</small>
+                                    <?php else: ?>
+                                        <select class="form-select" id="kode_dokter" name="kode_dokter" required>
+                                            <option value="">Pilih Dokter</option>
+                                            <?php if (!empty($all_dokter)): ?>
+                                                <?php foreach ($all_dokter as $dokter): ?>
+                                                    <option value="<?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?>"><?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?> - <?= htmlspecialchars($dokter['nama_dokter'] ?? '') ?></option>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <option value="">Data dokter tidak tersedia</option>
+                                            <?php endif; ?>
+                                        </select>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -673,16 +742,22 @@ unset($_SESSION['notif_status'], $_SESSION['notif_message']);
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="edit_kode_dokter" class="form-label">Dokter <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="edit_kode_dokter" name="kode_dokter" required>
-                                        <option value="">Pilih Dokter</option>
-                                        <?php if (!empty($all_dokter)): ?>
-                                            <?php foreach ($all_dokter as $dokter): ?>
-                                                <option value="<?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?>"><?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?> - <?= htmlspecialchars($dokter['nama_dokter'] ?? '') ?></option>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <option value="">Data dokter tidak tersedia</option>
-                                        <?php endif; ?>
-                                    </select>
+                                    <?php if ($role == 'Dokter' || $role == 'dokter'): ?>
+                                        <input type="text" class="form-control readonly-field" value="<?= htmlspecialchars($kode_dokter_session) ?> - <?= htmlspecialchars(getNamaDokterByKode($kode_dokter_session, $all_dokter)) ?>" readonly disabled>
+                                        <input type="hidden" name="kode_dokter" value="<?= htmlspecialchars($kode_dokter_session) ?>">
+                                        <small class="text-muted">Dokter terikat dengan akun Anda (tidak dapat diubah)</small>
+                                    <?php else: ?>
+                                        <select class="form-select" id="edit_kode_dokter" name="kode_dokter" required>
+                                            <option value="">Pilih Dokter</option>
+                                            <?php if (!empty($all_dokter)): ?>
+                                                <?php foreach ($all_dokter as $dokter): ?>
+                                                    <option value="<?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?>"><?= htmlspecialchars($dokter['kode_dokter'] ?? '') ?> - <?= htmlspecialchars($dokter['nama_dokter'] ?? '') ?></option>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <option value="">Data dokter tidak tersedia</option>
+                                            <?php endif; ?>
+                                        </select>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -924,7 +999,11 @@ unset($_SESSION['notif_status'], $_SESSION['notif_message']);
 
         function showEditModal(id, pasien, dokter, jenis, tanggal_periksa, keluhan, diagnosa, catatan) {
             document.getElementById('edit_id_rekam').value = id;
+            
+            <?php if ($role != 'Dokter' && $role != 'dokter'): ?>
             document.getElementById('edit_kode_dokter').value = dokter;
+            <?php endif; ?>
+            
             document.getElementById('edit_jenis_kunjungan').value = jenis;
             document.getElementById('edit_tanggal_periksa_display').value = tanggal_periksa ? formatTanggal(tanggal_periksa) : '-';
             document.getElementById('edit_keluhan').value = keluhan;

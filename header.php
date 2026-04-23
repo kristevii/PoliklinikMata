@@ -724,33 +724,13 @@ if ($id_user && $role) {
                 <span>Settings</span>
               </span>
             </a>
-            <a href="#" class="dropdown-item">
+            <a href="profile.php" class="dropdown-item">
               <span>
                 <svg class="pc-icon text-muted me-2">
                   <use xlink:href="#custom-lock-outline"></use>
                 </svg>
                 <span>Change Password</span>
               </span>
-            </a>
-            <hr class="border-secondary border-opacity-50" />
-            <p class="text-span">Team</p>
-            <a href="#" class="dropdown-item">
-              <span>
-                <svg class="pc-icon text-muted me-2">
-                  <use xlink:href="#custom-profile-2user-outline"></use>
-                </svg>
-                <span>UI Design team</span>
-              </span>
-              <div class="user-group">
-                <img src="assets/images/user/avatar-1.jpg" alt="user-image" class="avtar" />
-                <span class="avtar bg-danger text-white">K</span>
-                <span class="avtar bg-success text-white">
-                  <svg class="pc-icon m-0">
-                    <use xlink:href="#custom-user"></use>
-                  </svg>
-                </span>
-                <span class="avtar bg-light-primary text-primary">+2</span>
-              </div>
             </a>
             <hr class="border-secondary border-opacity-50" />
             <!-- MODIFIED: Tombol logout di dropdown profile -->

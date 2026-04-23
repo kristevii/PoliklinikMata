@@ -238,6 +238,15 @@ class database {
         }
         return $hasil;
     }
+    function tampil_data_rekam_medis_by_dokter($kode_dokter) {
+        $query = "SELECT * FROM data_rekam_medis WHERE kode_dokter = '$kode_dokter' ORDER BY id_rekam ASC";
+        $data = mysqli_query($this->koneksi, $query);
+        $hasil = [];
+        while ($d = mysqli_fetch_array($data)) {
+            $hasil[] = $d;
+        }
+        return $hasil;
+    }
     function tampil_data_jadwal_dokter(){
         $hasil = [];
         $data = mysqli_query($this->koneksi, "select id_jadwal, kode_dokter, hari, shift, jam_mulai, jam_selesai, status from data_jadwal_dokter");

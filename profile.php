@@ -10,6 +10,76 @@ $role = $_SESSION['role'] ?? 'Administrasi';
 $email_session = $_SESSION['email'] ?? 'juna.arka@eyethica.com';
 $id_user = $_SESSION['id_user'] ?? null;
 
+// Proses Ganti Password
+$password_message = '';
+$password_message_type = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'ganti_password') {
+    $current_password = $_POST['current_password'] ?? '';
+    $new_password = $_POST['new_password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    
+    // Validasi
+    if (!$id_user) {
+        $password_message = 'Sesi tidak valid. Silakan login kembali.';
+        $password_message_type = 'danger';
+    } elseif (empty($current_password)) {
+        $password_message = 'Password lama harus diisi.';
+        $password_message_type = 'danger';
+    } elseif (empty($new_password)) {
+        $password_message = 'Password baru harus diisi.';
+        $password_message_type = 'danger';
+    } elseif (strlen($new_password) < 8) {
+        $password_message = 'Password baru minimal 8 karakter.';
+        $password_message_type = 'danger';
+    } elseif (!preg_match('/[A-Z]/', $new_password)) {
+        $password_message = 'Password baru harus mengandung huruf besar.';
+        $password_message_type = 'danger';
+    } elseif (!preg_match('/[a-z]/', $new_password)) {
+        $password_message = 'Password baru harus mengandung huruf kecil.';
+        $password_message_type = 'danger';
+    } elseif (!preg_match('/[0-9]/', $new_password)) {
+        $password_message = 'Password baru harus mengandung angka.';
+        $password_message_type = 'danger';
+    } elseif ($new_password !== $confirm_password) {
+        $password_message = 'Konfirmasi password baru tidak cocok.';
+        $password_message_type = 'danger';
+    } else {
+        // Cek password lama dari database (PLAIN TEXT)
+        $query = "SELECT password FROM users WHERE id_user = '$id_user'";
+        $result = $db->koneksi->query($query);
+        
+        if ($result && $result->num_rows > 0) {
+            $user = $result->fetch_assoc();
+            
+            // Verifikasi password lama - PLAIN TEXT (langsung dibandingkan)
+            if ($user['password'] !== $current_password) {
+                $password_message = 'Password lama tidak sesuai.';
+                $password_message_type = 'danger';
+            } else {
+                // Update password baru - LANGSUNG DISIMPAN (PLAIN TEXT)
+                $update_query = "UPDATE users SET password = '$new_password' WHERE id_user = '$id_user'";
+                
+                if ($db->koneksi->query($update_query)) {
+                    $password_message = 'Password berhasil diubah! Silakan login kembali dengan password baru.';
+                    $password_message_type = 'success';
+                    
+                    // Optional: Logout setelah ganti password
+                    // session_destroy();
+                    // header('Location: login.php');
+                    // exit;
+                } else {
+                    $password_message = 'Gagal mengupdate password: ' . $db->koneksi->error;
+                    $password_message_type = 'danger';
+                }
+            }
+        } else {
+            $password_message = 'User tidak ditemukan.';
+            $password_message_type = 'danger';
+        }
+    }
+}
+
 // Cek role
 $isStaff = ($role === 'staff' || $role === 'Staff');
 $isDokter = ($role === 'dokter' || $role === 'Dokter');
@@ -132,7 +202,6 @@ if ($id_user) {
                 }
                 
                 // PERBAIKAN: Hitung kontrol terjadwal dari data_antrian dengan jenis_antrian = 'Kontrol'
-                // Menggunakan status yang sesuai dengan data_antrian (Menunggu, Dijadwalkan, dll)
                 $query_kontrol = "SELECT COUNT(*) as total 
                                   FROM data_antrian 
                                   WHERE kode_dokter = '$kode_dokter' 
@@ -172,7 +241,7 @@ if ($id_user) {
             }
         }
     } elseif ($isStaff) {
-        // Query untuk data staff - SESUAI DENGAN STRUKTUR TABLE
+        // Query untuk data staff
         $query_staff = "SELECT 
                             kode_staff,
                             nama_staff,
@@ -191,12 +260,10 @@ if ($id_user) {
         if ($result_staff && $result_staff->num_rows > 0) {
             $staff_data = $result_staff->fetch_assoc();
             
-            // Mapping data staff
             $kode_staff = $staff_data['kode_staff'] ?? '';
             $nama_lengkap = $staff_data['nama_staff'] ?? $username;
             $jabatan = $staff_data['jabatan_staff'] ?? '-';
             
-            // Konversi jenis kelamin
             $jk = $staff_data['jenis_kelamin_staff'] ?? '-';
             if ($jk == 'L') $jenis_kelamin = 'Laki-laki';
             elseif ($jk == 'P') $jenis_kelamin = 'Perempuan';
@@ -207,7 +274,6 @@ if ($id_user) {
             $telepon = $staff_data['telepon_staff'] ?? '-';
             $email = $staff_data['email'] ?? $email_session;
             
-            // Foto profile
             if (!empty($staff_data['foto_staff'])) {
                 $foto_staff = $staff_data['foto_staff'];
                 if (strpos($foto_staff, 'http') === 0) {
@@ -222,7 +288,6 @@ if ($id_user) {
             }
         }
     } else {
-        // Untuk role lain (administrasi, dll)
         $query_user = "SELECT nama_lengkap, foto FROM users WHERE id_user = '$id_user'";
         $result_user = $db->koneksi->query($query_user);
         if ($result_user && $result_user->num_rows > 0) {
@@ -246,7 +311,6 @@ if ($id_user) {
 function getRekanKerja($db, $current_role) {
     $rekan_kerja = [];
     
-    // Ambil data dokter
     $query_dokter = "SELECT 
                         nama_dokter as nama, 
                         subspesialisasi as jabatan, 
@@ -263,7 +327,6 @@ function getRekanKerja($db, $current_role) {
         }
     }
     
-    // Ambil data staff
     $query_staff = "SELECT 
                         nama_staff as nama, 
                         jabatan_staff as jabatan, 
@@ -280,7 +343,6 @@ function getRekanKerja($db, $current_role) {
         }
     }
     
-    // Proses path foto untuk setiap rekan kerja
     foreach ($rekan_kerja as &$rk) {
         if (empty($rk['foto'])) {
             $rk['foto'] = 'assets/images/user/avatar-1.jpg';
@@ -288,50 +350,25 @@ function getRekanKerja($db, $current_role) {
             if ($rk['tipe'] == 'dokter') {
                 if (file_exists('image-dokter/' . $rk['foto'])) {
                     $rk['foto'] = 'image-dokter/' . $rk['foto'];
-                } elseif (file_exists($rk['foto'])) {
-                    // Path sudah lengkap
-                } else {
+                } elseif (!file_exists($rk['foto'])) {
                     $rk['foto'] = 'assets/images/user/avatar-1.jpg';
                 }
             } else {
                 if (file_exists('image-staff/' . $rk['foto'])) {
                     $rk['foto'] = 'image-staff/' . $rk['foto'];
-                } elseif (file_exists($rk['foto'])) {
-                    // Path sudah lengkap
-                } else {
+                } elseif (!file_exists($rk['foto'])) {
                     $rk['foto'] = 'assets/images/user/avatar-2.jpg';
                 }
             }
         }
     }
     
-    // Jika masih kosong, gunakan data dummy
     if (empty($rekan_kerja)) {
         $rekan_kerja = [
-            [
-                'nama' => 'Dr. Sarah Wijaya', 
-                'jabatan' => 'Dokter Mata', 
-                'foto' => 'assets/images/user/avatar-1.jpg',
-                'tipe' => 'dokter'
-            ],
-            [
-                'nama' => 'Budi Santoso', 
-                'jabatan' => 'Staff Administrasi', 
-                'foto' => 'assets/images/user/avatar-2.jpg',
-                'tipe' => 'staff'
-            ],
-            [
-                'nama' => 'Dr. Ahmad Rasyid', 
-                'jabatan' => 'Dokter Umum', 
-                'foto' => 'assets/images/user/avatar-3.jpg',
-                'tipe' => 'dokter'
-            ],
-            [
-                'nama' => 'Siti Nurhaliza', 
-                'jabatan' => 'Perawat', 
-                'foto' => 'assets/images/user/avatar-4.jpg',
-                'tipe' => 'staff'
-            ]
+            ['nama' => 'Dr. Sarah Wijaya', 'jabatan' => 'Dokter Mata', 'foto' => 'assets/images/user/avatar-1.jpg', 'tipe' => 'dokter'],
+            ['nama' => 'Budi Santoso', 'jabatan' => 'Staff Administrasi', 'foto' => 'assets/images/user/avatar-2.jpg', 'tipe' => 'staff'],
+            ['nama' => 'Dr. Ahmad Rasyid', 'jabatan' => 'Dokter Umum', 'foto' => 'assets/images/user/avatar-3.jpg', 'tipe' => 'dokter'],
+            ['nama' => 'Siti Nurhaliza', 'jabatan' => 'Perawat', 'foto' => 'assets/images/user/avatar-4.jpg', 'tipe' => 'staff']
         ];
     }
     
@@ -340,7 +377,6 @@ function getRekanKerja($db, $current_role) {
 
 $rekan_kerja = getRekanKerja($db, $role);
 
-// Format tanggal lahir untuk tampilan
 if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
     $tanggal_lahir_formatted = date('d F Y', strtotime($tanggal_lahir));
 } else {
@@ -363,7 +399,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
     <link rel="stylesheet" href="assets/css/style.css" id="main-style-link" >
     <link rel="stylesheet" href="assets/css/style-preset.css">
     <style>
-        /* CSS untuk informasi personal dengan gaya baru */
         .info-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -445,8 +480,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
         .profile-badge i {
             margin-right: 0.3rem;
         }
-
-        /* Jadwal table styles (tetap) */
         .jadwal-table th {
             font-weight: 600;
             font-size: 0.85rem;
@@ -457,7 +490,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
         }
         .jadwal-table td {
             vertical-align: middle;
-            border-bottom: 1px ;
             text-align: center;
             font-size: 0.9rem;
         }
@@ -491,16 +523,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
             background-color: #fee2e2;
             color: #991b1b;
         }
-        .jadwal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .jadwal-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #343a40;
-        }
         .no-data {
             text-align: center;
             padding: 40px;
@@ -520,19 +542,54 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
             font-weight: 600;
             color: #343a40;
         }
-        .table-container {
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .info-divider {
-            margin: 1.5rem 0;
-            border-top: 1px dashed #dee2e6;
-        }
         .wid-100 {
             width: 100px;
             height: 100px;
             object-fit: cover;
+        }
+        .modal-backdrop {
+            z-index: 1040;
+        }
+        
+        /* Password strength indicator */
+        .password-strength {
+            margin-top: 8px;
+        }
+        .strength-bar {
+            height: 4px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            margin-top: 5px;
+        }
+        .strength-text {
+            font-size: 0.75rem;
+            margin-top: 5px;
+        }
+        .strength-weak {
+            background-color: #dc3545;
+            width: 33%;
+        }
+        .strength-medium {
+            background-color: #ffc107;
+            width: 66%;
+        }
+        .strength-strong {
+            background-color: #198754;
+            width: 100%;
+        }
+        .text-weak {
+            color: #dc3545;
+        }
+        .text-medium {
+            color: #ffc107;
+        }
+        .text-strong {
+            color: #198754;
+        }
+        
+        /* Auto-hide notification */
+        .auto-hide-alert {
+            transition: opacity 0.5s ease;
         }
     </style>
 </head>
@@ -562,7 +619,25 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                 </div>
             </div>
 
-            <!-- Statistik Cards - Hanya untuk Dokter -->
+            <?php if ($password_message): ?>
+            <div class="alert alert-<?php echo $password_message_type; ?> alert-dismissible fade show auto-hide-alert" role="alert" id="notificationAlert">
+                <?php echo $password_message; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <script>
+                // Auto hide notification after 5 seconds
+                setTimeout(function() {
+                    var alert = document.getElementById('notificationAlert');
+                    if (alert) {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            if(alert) alert.remove();
+                        }, 500);
+                    }
+                }, 5000);
+            </script>
+            <?php endif; ?>
+
             <?php if ($isDokter): ?>
             <div class="row mb-4">
                 <div class="col-md-4">
@@ -614,7 +689,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                             <h5>Informasi Personal</h5>
                         </div>
                         <div class="card-body">
-                            <!-- Profile Header dengan avatar dan role -->
                             <div class="profile-header">
                                 <div class="profile-avatar">
                                     <img src="<?php echo htmlspecialchars($foto_profile); ?>" 
@@ -637,9 +711,7 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                 </div>
                             </div>
 
-                            <!-- Grid informasi personal dengan gaya baru -->
                             <div class="info-grid">
-                                <!-- Nama Lengkap -->
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-user"></i></div>
                                     <div class="info-content">
@@ -648,7 +720,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     </div>
                                 </div>
                                 
-                                <!-- ID Pegawai / Kode -->
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-id"></i></div>
                                     <div class="info-content">
@@ -667,7 +738,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     </div>
                                 </div>
                                 
-                                <!-- Spesialisasi / Jabatan (khusus) -->
                                 <?php if ($isDokter): ?>
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-stethoscope"></i></div>
@@ -686,7 +756,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                 </div>
                                 <?php endif; ?>
                                 
-                                <!-- Ruang Praktek (khusus dokter) -->
                                 <?php if ($isDokter): ?>
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-layout-2"></i></div>
@@ -697,7 +766,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                 </div>
                                 <?php endif; ?>
                                 
-                                <!-- Tanggal Lahir -->
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-calendar"></i></div>
                                     <div class="info-content">
@@ -706,7 +774,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     </div>
                                 </div>
                                 
-                                <!-- Jenis Kelamin -->
                                 <div class="info-item">
                                     <div class="info-icon"><i class="fas fa-venus-mars"></i></div>
                                     <div class="info-content">
@@ -715,7 +782,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     </div>
                                 </div>
                                 
-                                <!-- Email -->
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-mail"></i></div>
                                     <div class="info-content">
@@ -724,7 +790,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     </div>
                                 </div>
                                 
-                                <!-- Telepon -->
                                 <div class="info-item">
                                     <div class="info-icon"><i class="ti ti-phone"></i></div>
                                     <div class="info-content">
@@ -733,7 +798,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     </div>
                                 </div>
                                 
-                                <!-- Alamat (full width) -->
                                 <div class="info-item" style="grid-column: span 2;">
                                     <div class="info-icon"><i class="ti ti-map-pin"></i></div>
                                     <div class="info-content">
@@ -745,7 +809,6 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                         </div>
                     </div>
 
-                    <!-- Jadwal Praktik - Hanya untuk Dokter -->
                     <?php if ($isDokter): ?>
                     <div class="card mt-4">
                         <div class="card-header">
@@ -756,9 +819,7 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                         <div class="card-body">
                             <?php if (empty($jadwal_praktik)): ?>
                             <div class="no-data">
-                                <div class="no-data-icon">
-                                    <i class="ti ti-calendar"></i>
-                                </div>
+                                <div class="no-data-icon"><i class="ti ti-calendar"></i></div>
                                 <h5 class="mb-2">Belum Ada Jadwal Praktik</h5>
                                 <p class="text-muted">Jadwal praktik Anda belum diatur. Silakan hubungi administrasi.</p>
                             </div>
@@ -766,13 +827,7 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                             <div class="table-responsive">
                                 <table class="table jadwal-table">
                                     <thead>
-                                        <tr>
-                                            <th>Hari</th>
-                                            <th>Shift</th>
-                                            <th>Status</th>
-                                            <th>Jam Mulai</th>
-                                            <th>Jam Selesai</th>
-                                        </tr>
+                                        <tr><th>Hari</th><th>Shift</th><th>Status</th><th>Jam Mulai</th><th>Jam Selesai</th></tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($jadwal_praktik as $jadwal): 
@@ -780,25 +835,11 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                             $shift = $jadwal['shift'] ?? 'Pagi';
                                             $jam_mulai = !empty($jadwal['jam_mulai']) ? date('H:i', strtotime($jadwal['jam_mulai'])) : '08:00';
                                             $jam_selesai = !empty($jadwal['jam_selesai']) ? date('H:i', strtotime($jadwal['jam_selesai'])) : '14:00';
-                                            
-                                            // Tentukan class status
-                                            $status_class = 'status-aktif';
-                                            if ($status === 'Libur') {
-                                                $status_class = 'status-libur';
-                                            } elseif ($status === 'Cuti') {
-                                                $status_class = 'status-cuti';
-                                            }
+                                            $status_class = $status === 'Libur' ? 'status-libur' : ($status === 'Cuti' ? 'status-cuti' : 'status-aktif');
                                         ?>
-                                        <tr>
-                                            <td class="hari-cell"><?php echo htmlspecialchars($jadwal['hari']); ?></td>
-                                            <td>
-                                                <span class="shift-badge"><?php echo htmlspecialchars($shift); ?></span>
-                                            </td>
-                                            <td>
-                                                <span class="status-badge <?php echo $status_class; ?>">
-                                                    <?php echo htmlspecialchars($status); ?>
-                                                </span>
-                                            </td>
+                                        <tr><td class="hari-cell"><?php echo htmlspecialchars($jadwal['hari']); ?></td>
+                                            <td><span class="shift-badge"><?php echo htmlspecialchars($shift); ?></span></td>
+                                            <td><span class="status-badge <?php echo $status_class; ?>"><?php echo htmlspecialchars($status); ?></span></td>
                                             <td class="time-cell"><?php echo $jam_mulai; ?></td>
                                             <td class="time-cell"><?php echo $jam_selesai; ?></td>
                                         </tr>
@@ -813,11 +854,8 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                 </div>
 
                 <div class="col-lg-4">
-                    <!-- Aktivitas Terakhir -->
                     <div class="card">
-                        <div class="card-header">
-                            <h5>Aktivitas Profil Terbaru</h5>
-                        </div>
+                        <div class="card-header"><h5>Aktivitas Profil Terbaru</h5></div>
                         <div class="card-body p-0">
                             <div class="list-group list-group-flush">
                                 <?php if (!empty($aktivitas_terakhir)): ?>
@@ -825,33 +863,11 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                                     <div class="list-group-item border-0">
                                         <div class="d-flex align-items-start">
                                             <div class="avtar avtar-s bg-light-secondary text-secondary flex-shrink-0">
-                                                <?php 
-                                                // Icon berdasarkan jenis aktivitas
-                                                $icon = 'ti ti-circle-check';
-                                                if (isset($act['jenis'])) {
-                                                    if (strpos(strtolower($act['jenis']), 'login') !== false) {
-                                                        $icon = 'ti ti-login';
-                                                    } elseif (strpos(strtolower($act['jenis']), 'logout') !== false || strpos(strtolower($act['jenis']), 'logout') !== false) {
-                                                        $icon = 'ti ti-logout';
-                                                    } elseif (strpos(strtolower($act['jenis']), 'update') !== false || strpos(strtolower($act['jenis']), 'ubah') !== false) {
-                                                        $icon = 'ti ti-edit';
-                                                    } 
-                                                }
-                                                ?>
-                                                <i class="<?php echo $icon; ?>"></i>
+                                                <i class="ti ti-circle-check"></i>
                                             </div>
                                             <div class="flex-grow-1 ms-3">
-                                                <p class="mb-0 text-dark">
-                                                    <?php echo htmlspecialchars($act['keterangan'] ?? '-'); ?>
-                                                </p>
-                                                <small class="text-muted">
-                                                    <?php 
-                                                    if (!empty($act['waktu'])) {
-                                                        $waktu = strtotime($act['waktu']);
-                                                        echo date('d M Y H:i', $waktu);
-                                                    }
-                                                    ?>
-                                                </small>
+                                                <p class="mb-0 text-dark"><?php echo htmlspecialchars($act['keterangan'] ?? '-'); ?></p>
+                                                <small class="text-muted"><?php if (!empty($act['waktu'])) echo date('d M Y H:i', strtotime($act['waktu'])); ?></small>
                                             </div>
                                         </div>
                                     </div>
@@ -866,44 +882,27 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
                         </div>
                     </div>
 
-                    <!-- Rekan Kerja -->
                     <div class="card">
-                        <div class="card-header">
-                            <h5>Rekan Kerja Aktif</h5>
-                        </div>
+                        <div class="card-header"><h5>Rekan Kerja Aktif</h5></div>
                         <div class="card-body">
                             <div class="user-group">
-                                <?php 
-                                $count = 0;
-                                foreach($rekan_kerja as $rk): 
-                                    if ($count >= 4) break;
-                                ?>
-                                    <img src="<?php echo htmlspecialchars($rk['foto']); ?>" 
-                                         alt="user" 
-                                         class="avtar avtar-s" 
-                                         title="<?php echo htmlspecialchars($rk['nama'] . ' - ' . $rk['jabatan']); ?>"
-                                         onerror="this.src='assets/images/user/avatar-1.jpg'">
-                                <?php 
-                                    $count++;
-                                endforeach; 
-                                ?>
+                                <?php $count = 0; foreach($rekan_kerja as $rk): if ($count >= 4) break; ?>
+                                    <img src="<?php echo htmlspecialchars($rk['foto']); ?>" alt="user" class="avtar avtar-s" title="<?php echo htmlspecialchars($rk['nama'] . ' - ' . $rk['jabatan']); ?>" onerror="this.src='assets/images/user/avatar-1.jpg'">
+                                <?php $count++; endforeach; ?>
                             </div>
                             <p class="text-muted small mt-3">Tim medis dan staff yang aktif hari ini.</p>
                         </div>
                     </div>
 
-                    <!-- Keamanan -->
                     <div class="card mt-4">
-                        <div class="card-header">
-                            <h5>Keamanan</h5>
-                        </div>
+                        <div class="card-header"><h5>Keamanan</h5></div>
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
                                     <h6 class="mb-0">Ganti Password</h6>
                                     <p class="text-muted small mb-0">Amankan akun Anda dengan password yang kuat.</p>
                                 </div>
-                                <button class="btn btn-outline-primary btn-sm" onclick="alert('Fitur ganti password akan segera tersedia.')">
+                                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#gantiPasswordModal">
                                     Ganti
                                 </button>
                             </div>
@@ -922,7 +921,71 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Modal Ganti Password -->
+    <div class="modal fade" id="gantiPasswordModal" tabindex="-1" aria-labelledby="gantiPasswordModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="gantiPasswordModalLabel">
+                        <i class="ti ti-lock me-2"></i> Ganti Password
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="" id="formGantiPassword">
+                    <input type="hidden" name="action" value="ganti_password">
+                    <div class="modal-body">
+
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label fw-medium">Password Lama <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="ti ti-key"></i></span>
+                                <input type="password" class="form-control border-start-0 ps-0" id="current_password" name="current_password" placeholder="Masukkan password lama" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="current_password">
+                                    <i class="ti ti-eye-off"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label fw-medium">Password Baru <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="ti ti-lock"></i></span>
+                                <input type="password" class="form-control border-start-0 ps-0" id="new_password" name="new_password" placeholder="Minimal 8 karakter" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="new_password">
+                                    <i class="ti ti-eye-off"></i>
+                                </button>
+                            </div>
+                            <div class="password-strength" id="passwordStrength">
+                                <div class="strength-bar" id="strengthBar"></div>
+                                <div class="strength-text" id="strengthText"></div>
+                            </div>
+                            <div class="form-text mt-1">
+                                <small>Password harus terdiri dari minimal 8 karakter, mengandung huruf besar, huruf kecil, dan angka.</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="confirm_password" class="form-label fw-medium">Konfirmasi Password Baru <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="ti ti-lock-check"></i></span>
+                                <input type="password" class="form-control border-start-0 ps-0" id="confirm_password" name="confirm_password" placeholder="Ulangi password baru" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="confirm_password">
+                                    <i class="ti ti-eye-off"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary" id="btnSimpanPassword">
+                            <i class="ti ti-device-floppy me-1"></i> Simpan Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="assets/js/plugins/popper.min.js"></script>
     <script src="assets/js/plugins/simplebar.min.js"></script>
     <script src="assets/js/plugins/bootstrap.min.js"></script>
@@ -933,17 +996,146 @@ if ($tanggal_lahir != '-' && $tanggal_lahir != '') {
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Preview foto sebelum upload
         document.getElementById('upload')?.addEventListener('change', function(e) {
             if (this.files && this.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    // Tampilkan preview (implementasi sesuai kebutuhan)
-                    alert('Foto berhasil dipilih. Fitur upload akan segera tersedia.');
-                }
-                reader.readAsDataURL(this.files[0]);
+                alert('Foto berhasil dipilih. Fitur upload akan segera tersedia.');
             }
         });
+    });
+
+    // Toggle password visibility
+    document.querySelectorAll('.toggle-password').forEach(button => {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            const icon = this.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('ti-eye-off');
+                icon.classList.add('ti-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('ti-eye');
+                icon.classList.add('ti-eye-off');
+            }
+        });
+    });
+
+    // Password strength checker
+    function checkPasswordStrength(password) {
+        let strength = 0;
+        let strengthText = '';
+        let strengthClass = '';
+        
+        // Length check
+        if (password.length >= 8) strength++;
+        
+        // Uppercase check
+        if (/[A-Z]/.test(password)) strength++;
+        
+        // Lowercase check
+        if (/[a-z]/.test(password)) strength++;
+        
+        // Number check
+        if (/[0-9]/.test(password)) strength++;
+        
+        // Special character check (optional bonus)
+        if (/[^A-Za-z0-9]/.test(password)) strength++;
+        
+        switch(strength) {
+            case 0:
+            case 1:
+                strengthText = 'Lemah';
+                strengthClass = 'weak';
+                break;
+            case 2:
+            case 3:
+                strengthText = 'Sedang';
+                strengthClass = 'medium';
+                break;
+            case 4:
+            case 5:
+                strengthText = 'Kuat';
+                strengthClass = 'strong';
+                break;
+        }
+        
+        return { text: strengthText, class: strengthClass, score: strength };
+    }
+
+    function updateStrengthIndicator() {
+        const password = document.getElementById('new_password').value;
+        const strength = checkPasswordStrength(password);
+        const strengthBar = document.getElementById('strengthBar');
+        const strengthText = document.getElementById('strengthText');
+        
+        if (password.length === 0) {
+            strengthBar.style.display = 'none';
+            strengthText.style.display = 'none';
+            return;
+        }
+        
+        strengthBar.style.display = 'block';
+        strengthText.style.display = 'block';
+        
+        // Update bar class
+        strengthBar.className = 'strength-bar';
+        if (strength.class === 'weak') {
+            strengthBar.classList.add('strength-weak');
+            strengthText.innerHTML = '<span class="text-weak"><i class="ti ti-alert-circle"></i> Kekuatan Password: Lemah</span>';
+        } else if (strength.class === 'medium') {
+            strengthBar.classList.add('strength-medium');
+            strengthText.innerHTML = '<span class="text-medium"><i class="ti ti-info-circle"></i> Kekuatan Password: Sedang</span>';
+        } else if (strength.class === 'strong') {
+            strengthBar.classList.add('strength-strong');
+            strengthText.innerHTML = '<span class="text-strong"><i class="ti ti-check-circle"></i> Kekuatan Password: Kuat</span>';
+        }
+    }
+
+    // Real-time password strength check
+    const newPasswordInput = document.getElementById('new_password');
+    if (newPasswordInput) {
+        newPasswordInput.addEventListener('input', updateStrengthIndicator);
+    }
+
+    // Validasi client-side sebelum submit
+    document.getElementById('formGantiPassword').addEventListener('submit', function(e) {
+        let isValid = true;
+        const newPassword = document.getElementById('new_password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        
+        // Reset error
+        document.querySelectorAll('.is-invalid').forEach(el => {
+            el.classList.remove('is-invalid');
+        });
+        
+        // Validasi password baru
+        if (newPassword.length < 8) {
+            document.getElementById('new_password').classList.add('is-invalid');
+            alert('Password baru minimal 8 karakter.');
+            isValid = false;
+        } else if (!/[A-Z]/.test(newPassword)) {
+            document.getElementById('new_password').classList.add('is-invalid');
+            alert('Password baru harus mengandung huruf besar.');
+            isValid = false;
+        } else if (!/[a-z]/.test(newPassword)) {
+            document.getElementById('new_password').classList.add('is-invalid');
+            alert('Password baru harus mengandung huruf kecil.');
+            isValid = false;
+        } else if (!/[0-9]/.test(newPassword)) {
+            document.getElementById('new_password').classList.add('is-invalid');
+            alert('Password baru harus mengandung angka.');
+            isValid = false;
+        } else if (newPassword !== confirmPassword) {
+            document.getElementById('confirm_password').classList.add('is-invalid');
+            alert('Konfirmasi password tidak cocok.');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+        }
     });
     </script>
 </body>
